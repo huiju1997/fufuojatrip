@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>北九州輕旅行 V6.2 (堅固版)</title>
+    <title>北九州輕旅行 V6.3 (可編輯版)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -23,11 +23,8 @@
         #map { height: 100%; width: 100%; z-index: 0; }
         .leaflet-pane { z-index: 0 !important; }
         .card-img-gradient { background: linear-gradient(to bottom, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%); }
-        
-        /* 載入遮罩：在 Vue 啟動前遮住亂碼 */
         [v-cloak] { display: none !important; }
         
-        /* 系統載入提示 */
         #loading-screen {
             position: fixed; inset: 0; background: #f0fdfa; z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -37,12 +34,11 @@
 <body class="h-screen w-full overflow-hidden">
 
 <div id="loading-screen">
-    <i class="fa-solid fa-plane fa-bounce text-4xl text-teal-500 mb-4"></i>
+    <i class="fa-solid fa-pen-to-square fa-bounce text-4xl text-teal-500 mb-4"></i>
     <h2 class="text-xl font-bold text-teal-800">系統啟動中...</h2>
-    <p class="text-xs text-gray-400 mt-2">正在載入 Vue 引擎</p>
     <div id="error-msg" class="hidden mt-6 text-red-500 text-center px-6">
         <p class="font-bold">⚠️ 載入失敗</p>
-        <p class="text-xs mt-1">您的網路可能擋住了程式庫連線。<br>請嘗試切換 Wi-Fi/4G 或使用 VPN。</p>
+        <p class="text-xs mt-1">請檢查網路連線</p>
     </div>
 </div>
 
@@ -51,7 +47,7 @@
     <header class="bg-white/95 backdrop-blur pt-12 pb-3 px-6 z-20 border-b border-gray-100 flex justify-between items-end">
         <div>
             <h1 class="text-2xl font-bold tracking-wider text-teal-700">福岡の旅</h1>
-            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V6.2 Robust</p>
+            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V6.3 Editable</p>
         </div>
         <button @click="showSyncModal = true" class="bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center shadow-sm border border-teal-100 hover:bg-teal-100 transition-colors">
             <i class="fa-solid fa-arrows-rotate mr-1"></i> 同步
@@ -62,4 +58,448 @@
         
         <div v-if="currentTab === 'schedule'" class="p-5">
             <div class="flex space-x-3 overflow-x-auto no-scrollbar mb-6 py-2">
-                <button v-for="day in days"
+                <button v-for="day in days" :key="day" @click="changeDay(day)"
+                    :class="['px-5 py-2 rounded-full text-sm font-bold transition-all shadow-sm whitespace-nowrap', 
+                             activeDay === day ? 'bg-teal-500 text-white shadow-teal-200' : 'bg-white text-gray-400 border border-gray-100']">
+                    Day {{ day }}
+                </button>
+                <button @click="days.push(days.length + 1)" class="px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-400 ios-btn"><i class="fa-solid fa-plus"></i></button>
+            </div>
+
+            <div class="space-y-8">
+                <div v-if="filteredItinerary.length === 0" class="text-center py-20 text-gray-300 font-light">
+                    點擊右下角 + 新增行程
+                </div>
+                
+                <div v-for="item in filteredItinerary" :key="item.id" class="relative pl-6 border-l-[2px] border-teal-100 ml-3">
+                    <div class="absolute -left-[9px] top-6 w-4 h-4 rounded-full bg-white border-[4px] border-teal-400 z-10"></div>
+                    
+                    <div class="bg-white rounded-2xl shadow-md border border-gray-50 ios-btn relative overflow-hidden group">
+                        
+                        <div v-if="item.img" class="h-40 w-full relative overflow-hidden group/img">
+                            <img :src="item.img" class="w-full h-full object-cover" @error="item.img = null">
+                            <div class="absolute inset-0 card-img-gradient"></div>
+                            
+                            <div class="absolute top-2 right-2 flex space-x-2">
+                                <button @click.stop="editItem(item)" class="bg-black/40 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-teal-500 transition-colors">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button @click.stop="deleteItem(item.id)" class="bg-black/40 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm hover:bg-red-500 transition-colors">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="p-5 pt-4 relative">
+                            <div v-if="!item.img" class="flex justify-end absolute top-4 right-4 space-x-1">
+                                <button @click="editItem(item)" class="text-gray-300 hover:text-teal-500 p-2">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button @click="deleteItem(item.id)" class="text-gray-300 hover:text-red-400 p-2">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+
+                            <div class="flex items-baseline space-x-2 mb-1 pr-16"> <span class="text-teal-600 font-black text-xl">{{ item.time }}</span>
+                                <h3 class="font-bold text-lg text-gray-800">{{ item.location }}</h3>
+                            </div>
+                            
+                            <p v-if="item.desc" class="text-gray-600 text-sm leading-relaxed mb-3 font-medium">
+                                {{ item.desc }}
+                            </p>
+
+                            <div v-if="item.note" class="bg-gray-50 p-2 rounded-lg text-xs text-gray-400 mb-3 flex items-start">
+                                <i class="fa-solid fa-circle-info mt-0.5 mr-1.5 text-teal-400"></i>
+                                <span>{{ item.note }}</span>
+                            </div>
+                            
+                            <div class="flex items-center space-x-2 mt-2">
+                                <button v-if="item.lat" @click="showOnMap(item)" class="text-xs text-teal-600 bg-teal-50 px-3 py-1.5 rounded-lg font-bold flex items-center">
+                                    <i class="fa-solid fa-map-location-dot mr-1"></i> 地圖
+                                </button>
+                                <button v-else @click="manualLocate(item)" class="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg font-bold flex items-center hover:bg-teal-50 hover:text-teal-600 transition-colors">
+                                    <span v-if="item.isLocating"><i class="fa-solid fa-spinner fa-spin mr-1"></i>搜尋中...</span>
+                                    <span v-else><i class="fa-solid fa-thumbtack mr-1"></i>定位</span>
+                                </button>
+                                <a :href="'https://www.google.com/maps/search/?api=1&query=' + item.location" target="_blank" class="text-xs text-blue-400 bg-blue-50 px-3 py-1.5 rounded-lg font-bold flex items-center">
+                                    <i class="fa-brands fa-google mr-1"></i> 導航
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentTab === 'money'" class="p-5">
+            <div class="bg-teal-800 text-teal-50 p-5 rounded-2xl shadow-lg mb-6 flex justify-between items-center">
+                <div>
+                    <div class="text-xs opacity-70 mb-1">匯率 (JPY → TWD)</div>
+                    <div class="text-2xl font-bold flex items-center">
+                        <span class="mr-2">×</span>
+                        <input type="number" step="0.001" v-model="exchangeRate" class="bg-transparent border-b border-teal-400 w-20 text-center focus:outline-none font-mono">
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs opacity-70">1000円 ≈</div>
+                    <div class="text-xl font-bold">NT$ {{ (1000 * exchangeRate).toFixed(0) }}</div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <input v-model="newExpense.payer" placeholder="付款人" class="bg-gray-50 p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100">
+                    <input type="number" v-model.number="newExpense.amount" placeholder="金額 (日幣)" class="bg-gray-50 p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100">
+                </div>
+                <input v-model="newExpense.desc" placeholder="項目" class="w-full bg-gray-50 p-3 rounded-xl text-center text-sm mb-3 outline-none focus:ring-2 ring-teal-100">
+                <button @click="addExpense" class="w-full bg-teal-500 text-white py-3 rounded-xl font-bold shadow-md ios-btn">記帳</button>
+            </div>
+
+            <div class="space-y-3">
+                <div v-for="(exp, idx) in expenses" :key="idx" class="bg-white p-4 rounded-xl flex justify-between items-center shadow-sm border border-gray-50">
+                    <div>
+                        <div class="font-bold text-gray-700">{{ exp.desc }}</div>
+                        <div class="text-xs text-gray-400">{{ exp.payer }} 付款</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-teal-600 font-bold">¥{{ exp.amount }}</div>
+                        <div class="text-[10px] text-gray-400">≈ NT$ {{ Math.round(exp.amount * exchangeRate) }}</div>
+                    </div>
+                    <button @click="expenses.splice(idx, 1); saveData()" class="ml-3 text-gray-200 hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+            
+            <div v-if="settlement.length > 0" class="mt-8 bg-white p-5 rounded-2xl border border-gray-100">
+                <h3 class="font-bold text-teal-800 mb-4 text-sm">結算建議 (台幣)</h3>
+                <ul class="space-y-2">
+                    <li v-for="s in settlement" class="flex justify-between text-sm text-gray-600 border-b border-gray-50 pb-2">
+                        <span>{{ s.from }} <i class="fa-solid fa-arrow-right text-xs mx-1"></i> {{ s.to }}</span>
+                        <span class="font-bold text-teal-600">NT$ {{ Math.round(s.amount * exchangeRate) }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div v-show="currentTab === 'map'" class="absolute inset-0 bg-gray-200 z-0">
+            <div id="map"></div>
+            <div class="absolute bottom-24 right-4 flex flex-col space-y-3 z-[400]">
+                <button @click="locateMe" class="w-12 h-12 bg-white rounded-full shadow-lg text-blue-500 flex items-center justify-center text-xl ios-btn">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                </button>
+                <button @click="fitAllMarkers" class="w-12 h-12 bg-white rounded-full shadow-lg text-teal-600 flex items-center justify-center text-xl ios-btn">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="bg-white/95 backdrop-blur border-t border-gray-100 flex justify-around items-center h-[85px] pb-6 fixed bottom-0 w-full max-w-md z-30">
+        <button @click="switchTab('schedule')" :class="['flex flex-col items-center w-full space-y-1', currentTab === 'schedule' ? 'text-teal-600' : 'text-gray-300']">
+            <i class="fa-solid fa-calendar-check text-xl"></i><span class="text-[10px]">行程</span>
+        </button>
+        <button @click="switchTab('money')" :class="['flex flex-col items-center w-full space-y-1', currentTab === 'money' ? 'text-teal-600' : 'text-gray-300']">
+            <i class="fa-solid fa-sack-dollar text-xl"></i><span class="text-[10px]">分帳</span>
+        </button>
+        <button @click="switchTab('map')" :class="['flex flex-col items-center w-full space-y-1', currentTab === 'map' ? 'text-teal-600' : 'text-gray-300']">
+            <i class="fa-solid fa-map text-xl"></i><span class="text-[10px]">地圖</span>
+        </button>
+    </nav>
+
+    <div v-if="showAddModal" class="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4">
+        <div class="bg-white w-full rounded-3xl p-6 shadow-2xl mb-4 animate-slide-up max-h-[90vh] overflow-y-auto">
+            <h3 class="font-bold text-gray-800 mb-4 text-center">{{ isEditing ? '編輯行程' : '新增行程' }}</h3>
+            <div class="space-y-4">
+                <input type="time" v-model="form.time" class="w-full bg-gray-50 p-3 rounded-xl text-center font-bold text-teal-700 outline-none">
+                <input type="text" v-model="form.location" placeholder="地點名稱" class="w-full bg-gray-50 p-3 rounded-xl outline-none text-center font-bold">
+                <div>
+                    <input type="text" v-model="form.img" placeholder="圖片連結 (貼上網址)" class="w-full bg-gray-50 p-3 rounded-xl outline-none text-xs text-gray-500 mb-2">
+                    <div v-if="form.img" class="w-full h-32 rounded-xl overflow-hidden bg-gray-100">
+                        <img :src="form.img" class="w-full h-full object-cover" alt="預覽" @error="form.img = ''">
+                    </div>
+                </div>
+                <textarea v-model="form.desc" placeholder="景點介紹..." class="w-full bg-gray-50 p-3 rounded-xl outline-none h-24 resize-none text-sm"></textarea>
+                <input type="text" v-model="form.note" placeholder="備註提醒" class="w-full bg-gray-50 p-3 rounded-xl outline-none text-xs">
+                <div class="flex space-x-3 pt-2">
+                    <button @click="closeModal" class="flex-1 py-3 bg-gray-100 rounded-xl text-gray-500 font-bold">取消</button>
+                    <button @click="saveItemInstant" class="flex-1 py-3 bg-teal-500 text-white rounded-xl font-bold">
+                        {{ isEditing ? '更新' : '儲存' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div v-if="showSyncModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h3 class="text-xl font-bold text-teal-800 mb-2 text-center">行程資料同步</h3>
+            <div class="space-y-6">
+                <div class="bg-teal-50 p-4 rounded-xl border border-teal-100">
+                    <h4 class="font-bold text-teal-700 text-sm mb-2">匯出</h4>
+                    <textarea readonly class="w-full bg-white h-20 text-[10px] p-2 rounded-lg border border-teal-200 text-gray-500 font-mono resize-none mb-2" id="exportArea">{{ exportString }}</textarea>
+                    <button @click="copyCode" class="w-full bg-teal-500 text-white py-2 rounded-lg text-sm font-bold ios-btn">
+                        <span v-if="copySuccess"><i class="fa-solid fa-check"></i> 已複製</span>
+                        <span v-else>複製代碼</span>
+                    </button>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <h4 class="font-bold text-gray-700 text-sm mb-2">匯入</h4>
+                    <input v-model="importString" placeholder="貼上代碼..." class="w-full bg-white p-3 rounded-lg border border-gray-300 text-xs mb-2 outline-none">
+                    <button @click="importData" class="w-full bg-gray-700 text-white py-2 rounded-lg text-sm font-bold ios-btn">讀取覆蓋</button>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-between items-center border-t border-gray-100 pt-4">
+                <button @click="resetData" class="text-xs text-red-300 hover:text-red-500 px-2">重置</button>
+                <button @click="showSyncModal = false" class="px-6 py-2 bg-gray-100 rounded-xl text-gray-600 font-bold text-sm">關閉</button>
+            </div>
+        </div>
+    </div>
+    
+    <button v-if="currentTab === 'schedule'" @click="openAddModal" class="fixed bottom-24 right-6 w-14 h-14 bg-teal-500 text-white rounded-full shadow-lg shadow-teal-500/40 flex items-center justify-center text-xl ios-btn z-20">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+
+</div>
+
+<script>
+    setTimeout(() => { if (typeof Vue === 'undefined') document.getElementById('error-msg').classList.remove('hidden'); }, 3000);
+
+    const { createApp, nextTick } = Vue;
+
+    const app = createApp({
+        data() {
+            return {
+                currentTab: 'schedule',
+                activeDay: 1,
+                days: [1, 2, 3],
+                showAddModal: false,
+                showSyncModal: false,
+                importString: '',
+                copySuccess: false,
+                exchangeRate: 0.22,
+                map: null,
+                markers: [],
+                userMarker: null,
+                
+                // 編輯模式相關變數
+                isEditing: false,
+                
+                itinerary: JSON.parse(localStorage.getItem('trip_itinerary_v6')) || [
+                    { 
+                        id: 1, day: 1, time: '11:00', location: '福岡機場', 
+                        desc: '抵達福岡，記得先去櫃檯領取預約好的 JR Pass。', 
+                        note: '出關約需 40 分鐘',
+                        img: 'https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?auto=format&fit=crop&q=80&w=800', 
+                        lat: null, lng: null, isLocating: false 
+                    },
+                ],
+                form: { id: null, time: '', location: '', note: '', desc: '', img: '' },
+                expenses: JSON.parse(localStorage.getItem('trip_expenses_v6')) || [],
+                newExpense: { payer: '', amount: '', desc: '' }
+            }
+        },
+        mounted() {
+            const loader = document.getElementById('loading-screen');
+            if(loader) loader.style.display = 'none';
+            const savedRate = localStorage.getItem('trip_rate');
+            if(savedRate) this.exchangeRate = parseFloat(savedRate);
+        },
+        watch: {
+            exchangeRate(newVal) { localStorage.setItem('trip_rate', newVal); }
+        },
+        computed: {
+            filteredItinerary() {
+                return this.itinerary.filter(i => i.day === this.activeDay).sort((a,b) => a.time.localeCompare(b.time));
+            },
+            exportString() {
+                const data = { i: this.itinerary, e: this.expenses, r: this.exchangeRate };
+                try {
+                    return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+                } catch(e) { return "Error generating code"; }
+            },
+            settlement() {
+                let payers = {}; let total = 0;
+                this.expenses.forEach(e => {
+                    if (!payers[e.payer]) payers[e.payer] = 0;
+                    payers[e.payer] += e.amount; total += e.amount;
+                });
+                let people = Object.keys(payers);
+                if (people.length === 0) return [];
+                let avg = total / people.length;
+                let balance = people.map(p => ({ name: p, diff: payers[p] - avg }));
+                let creditors = balance.filter(b => b.diff > 0).sort((a,b) => b.diff - a.diff);
+                let debtors = balance.filter(b => b.diff < 0).sort((a,b) => a.diff - b.diff);
+                let res = []; let i = 0, j = 0;
+                while(i < creditors.length && j < debtors.length){
+                    let min = Math.min(creditors[i].diff, Math.abs(debtors[j].diff));
+                    if(min > 10) res.push({ from: debtors[j].name, to: creditors[i].name, amount: Math.round(min) });
+                    creditors[i].diff -= min; debtors[j].diff += min;
+                    if(creditors[i].diff < 1) i++; if(Math.abs(debtors[j].diff) < 1) j++;
+                }
+                return res;
+            }
+        },
+        methods: {
+            // --- 編輯功能區 ---
+            openAddModal() {
+                this.isEditing = false;
+                this.form = { id: null, time: '', location: '', note: '', desc: '', img: '' };
+                this.showAddModal = true;
+            },
+            editItem(item) {
+                // 將資料複製到 form，並開啟編輯模式
+                this.form = { ...item };
+                this.isEditing = true;
+                this.showAddModal = true;
+            },
+            closeModal() {
+                this.showAddModal = false;
+                this.isEditing = false;
+                this.form = { id: null, time: '', location: '', note: '', desc: '', img: '' };
+            },
+            saveItemInstant() {
+                if (!this.form.time || !this.form.location) return alert('請輸入時間與地點');
+                
+                if (this.isEditing) {
+                    // 編輯模式：找到原本的項目並更新
+                    const index = this.itinerary.findIndex(i => i.id === this.form.id);
+                    if (index !== -1) {
+                        this.itinerary[index] = { 
+                            ...this.form, 
+                            day: this.activeDay // 保持在當前天數，或依需求修改
+                        };
+                    }
+                } else {
+                    // 新增模式
+                    this.itinerary.push({
+                        id: Date.now(), 
+                        day: this.activeDay, 
+                        time: this.form.time, 
+                        location: this.form.location, 
+                        note: this.form.note, 
+                        desc: this.form.desc, 
+                        img: this.form.img,
+                        lat: null, lng: null, isLocating: false
+                    });
+                }
+                
+                this.saveData();
+                this.closeModal();
+            },
+            
+            // --- 其他功能 ---
+            copyCode() {
+                const el = document.getElementById('exportArea');
+                el.select(); document.execCommand('copy');
+                this.copySuccess = true; setTimeout(() => this.copySuccess = false, 2000);
+            },
+            importData() {
+                if(!this.importString) return alert("請貼上代碼");
+                if(!confirm("這將會覆蓋你原本的資料，確定嗎？")) return;
+                try {
+                    const json = decodeURIComponent(escape(atob(this.importString.trim())));
+                    const data = JSON.parse(json);
+                    if(data.i) this.itinerary = data.i;
+                    if(data.e) this.expenses = data.e;
+                    if(data.r) this.exchangeRate = data.r;
+                    this.saveData();
+                    alert("同步成功！");
+                    this.showSyncModal = false;
+                    this.importString = '';
+                    location.reload();
+                } catch(e) { alert("代碼格式錯誤"); }
+            },
+            resetData() {
+                if(confirm('確定要清空資料重來嗎？')) {
+                    localStorage.removeItem('trip_itinerary_v6');
+                    localStorage.removeItem('trip_expenses_v6');
+                    location.reload();
+                }
+            },
+            switchTab(tab) {
+                this.currentTab = tab;
+                if (tab === 'map') nextTick(() => this.initMap());
+            },
+            changeDay(day) {
+                this.activeDay = day;
+                if (this.currentTab === 'map') this.updateMapMarkers();
+            },
+            initMap() {
+                if (this.map) { this.map.invalidateSize(); this.updateMapMarkers(); return; }
+                this.map = L.map('map').setView([33.5902, 130.4017], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(this.map);
+                this.updateMapMarkers();
+            },
+            updateMapMarkers() {
+                if (!this.map) return;
+                this.markers.forEach(m => this.map.removeLayer(m));
+                this.markers = [];
+                const points = [];
+                this.filteredItinerary.forEach(item => {
+                    if (item.lat && item.lng) {
+                        const marker = L.marker([item.lat, item.lng]).addTo(this.map).bindPopup(`<b>${item.time}</b><br>${item.location}`);
+                        this.markers.push(marker); points.push([item.lat, item.lng]);
+                    }
+                });
+                if (points.length > 0) this.map.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
+            },
+            showOnMap(item) {
+                this.switchTab('map');
+                nextTick(() => {
+                    this.map.setView([item.lat, item.lng], 16);
+                    L.popup().setLatLng([item.lat, item.lng]).setContent(item.location).openOn(this.map);
+                });
+            },
+            locateMe() {
+                if (!navigator.geolocation) return alert("瀏覽器不支援定位");
+                navigator.geolocation.getCurrentPosition(pos => {
+                    const { latitude, longitude } = pos.coords;
+                    if (this.userMarker) this.map.removeLayer(this.userMarker);
+                    this.userMarker = L.circleMarker([latitude, longitude], {
+                        radius: 8, fillColor: "#3b82f6", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8
+                    }).addTo(this.map).bindPopup("我在這！").openPopup();
+                    this.map.setView([latitude, longitude], 15);
+                }, () => alert("無法取得位置"));
+            },
+            fitAllMarkers() { this.updateMapMarkers(); },
+            
+            async manualLocate(item) {
+                item.isLocating = true;
+                try {
+                    const q = encodeURIComponent(item.location + " Fukuoka");
+                    const controller = new AbortController();
+                    setTimeout(() => controller.abort(), 3000); 
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`, { signal: controller.signal });
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        item.lat = parseFloat(data[0].lat);
+                        item.lng = parseFloat(data[0].lon);
+                        this.saveData(); 
+                    } else { alert('找不到地點'); }
+                } catch (e) { alert('連線失敗或超時'); } 
+                finally { item.isLocating = false; }
+            },
+            saveData() {
+                localStorage.setItem('trip_itinerary_v6', JSON.stringify(this.itinerary));
+                localStorage.setItem('trip_expenses_v6', JSON.stringify(this.expenses));
+            },
+            addExpense() {
+                if(!this.newExpense.payer || !this.newExpense.amount) return;
+                this.expenses.unshift({...this.newExpense});
+                this.newExpense.amount = ''; this.newExpense.desc = '';
+                this.saveData();
+            },
+            deleteItem(id) {
+                if(confirm('刪除？')) {
+                    this.itinerary = this.itinerary.filter(i => i.id !== id);
+                    this.saveData();
+                }
+            }
+        }
+    });
+    
+    app.mount('#app');
+</script>
+
+</body>
+</html>
