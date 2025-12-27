@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>北九州輕旅行 V6.3 (可編輯版)</title>
+    <title>北九州輕旅行 V6.5 (記帳編輯版)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
     
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -28,17 +28,20 @@
         #loading-screen {
             position: fixed; inset: 0; background: #f0fdfa; z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.5s ease;
         }
     </style>
 </head>
 <body class="h-screen w-full overflow-hidden">
 
 <div id="loading-screen">
-    <i class="fa-solid fa-pen-to-square fa-bounce text-4xl text-teal-500 mb-4"></i>
-    <h2 class="text-xl font-bold text-teal-800">系統啟動中...</h2>
-    <div id="error-msg" class="hidden mt-6 text-red-500 text-center px-6">
-        <p class="font-bold">⚠️ 載入失敗</p>
-        <p class="text-xs mt-1">請檢查網路連線</p>
+    <div class="relative">
+        <i class="fa-solid fa-plane text-5xl text-teal-500 animate-bounce"></i>
+    </div>
+    <h2 class="text-xl font-bold text-teal-800 mt-4">福岡之旅準備中...</h2>
+    <div id="error-msg" class="hidden mt-6 text-red-500 text-center px-6 bg-red-50 p-4 rounded-xl border border-red-100">
+        <p class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 連線異常</p>
+        <p class="text-xs text-gray-600">您的網路無法連接到程式庫。<br>請嘗試切換 Wi-Fi / 4G 或重新整理。</p>
     </div>
 </div>
 
@@ -47,7 +50,7 @@
     <header class="bg-white/95 backdrop-blur pt-12 pb-3 px-6 z-20 border-b border-gray-100 flex justify-between items-end">
         <div>
             <h1 class="text-2xl font-bold tracking-wider text-teal-700">福岡の旅</h1>
-            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V6.3 Editable</p>
+            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V6.5 Money Edit</p>
         </div>
         <button @click="showSyncModal = true" class="bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center shadow-sm border border-teal-100 hover:bg-teal-100 transition-colors">
             <i class="fa-solid fa-arrows-rotate mr-1"></i> 同步
@@ -100,7 +103,8 @@
                                 </button>
                             </div>
 
-                            <div class="flex items-baseline space-x-2 mb-1 pr-16"> <span class="text-teal-600 font-black text-xl">{{ item.time }}</span>
+                            <div class="flex items-baseline space-x-2 mb-1 pr-16">
+                                <span class="text-teal-600 font-black text-xl">{{ item.time }}</span>
                                 <h3 class="font-bold text-lg text-gray-800">{{ item.location }}</h3>
                             </div>
                             
@@ -146,26 +150,45 @@
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <input v-model="newExpense.payer" placeholder="付款人" class="bg-gray-50 p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100">
-                    <input type="number" v-model.number="newExpense.amount" placeholder="金額 (日幣)" class="bg-gray-50 p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100">
+            <div :class="['p-5 rounded-2xl shadow-sm border mb-6 transition-all', isEditingExpense ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100']">
+                <div v-if="isEditingExpense" class="text-xs font-bold text-orange-500 mb-2 flex items-center">
+                    <i class="fa-solid fa-pen mr-1"></i> 正在修改消費紀錄...
                 </div>
-                <input v-model="newExpense.desc" placeholder="項目" class="w-full bg-gray-50 p-3 rounded-xl text-center text-sm mb-3 outline-none focus:ring-2 ring-teal-100">
-                <button @click="addExpense" class="w-full bg-teal-500 text-white py-3 rounded-xl font-bold shadow-md ios-btn">記帳</button>
+                
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <input v-model="newExpense.payer" placeholder="付款人" class="bg-white p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100 border border-gray-100">
+                    <input ref="amountInput" type="number" v-model.number="newExpense.amount" placeholder="金額 (日幣)" class="bg-white p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100 border border-gray-100 font-bold text-gray-700">
+                </div>
+                <input v-model="newExpense.desc" placeholder="項目" class="w-full bg-white p-3 rounded-xl text-center text-sm mb-3 outline-none focus:ring-2 ring-teal-100 border border-gray-100">
+                
+                <div class="flex space-x-2">
+                    <button v-if="isEditingExpense" @click="cancelEditExpense" class="flex-1 bg-gray-300 text-gray-600 py-3 rounded-xl font-bold shadow-sm ios-btn">取消</button>
+                    <button @click="saveExpense" :class="['flex-1 py-3 rounded-xl font-bold shadow-md ios-btn text-white transition-colors', isEditingExpense ? 'bg-orange-500' : 'bg-teal-500']">
+                        {{ isEditingExpense ? '確認修改' : '記帳' }}
+                    </button>
+                </div>
             </div>
 
             <div class="space-y-3">
-                <div v-for="(exp, idx) in expenses" :key="idx" class="bg-white p-4 rounded-xl flex justify-between items-center shadow-sm border border-gray-50">
+                <div v-for="(exp, idx) in expenses" :key="idx" class="bg-white p-4 rounded-xl flex justify-between items-center shadow-sm border border-gray-50 group">
                     <div>
                         <div class="font-bold text-gray-700">{{ exp.desc }}</div>
                         <div class="text-xs text-gray-400">{{ exp.payer }} 付款</div>
                     </div>
-                    <div class="text-right">
-                        <div class="text-teal-600 font-bold">¥{{ exp.amount }}</div>
-                        <div class="text-[10px] text-gray-400">≈ NT$ {{ Math.round(exp.amount * exchangeRate) }}</div>
+                    <div class="flex items-center">
+                        <div class="text-right mr-3">
+                            <div class="text-teal-600 font-bold">¥{{ exp.amount }}</div>
+                            <div class="text-[10px] text-gray-400">≈ NT$ {{ Math.round(exp.amount * exchangeRate) }}</div>
+                        </div>
+                        <div class="flex space-x-1">
+                            <button @click="editExpense(idx)" class="w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:bg-teal-50 hover:text-teal-600 flex items-center justify-center transition-colors">
+                                <i class="fa-solid fa-pen text-xs"></i>
+                            </button>
+                            <button @click="deleteExpense(idx)" class="w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-400 flex items-center justify-center transition-colors">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button @click="expenses.splice(idx, 1); saveData()" class="ml-3 text-gray-200 hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
             
@@ -262,7 +285,12 @@
 </div>
 
 <script>
-    setTimeout(() => { if (typeof Vue === 'undefined') document.getElementById('error-msg').classList.remove('hidden'); }, 3000);
+    setTimeout(() => { 
+        const errorMsg = document.getElementById('error-msg');
+        if (typeof Vue === 'undefined' && errorMsg) {
+            errorMsg.classList.remove('hidden');
+        }
+    }, 4000);
 
     const { createApp, nextTick } = Vue;
 
@@ -281,8 +309,10 @@
                 markers: [],
                 userMarker: null,
                 
-                // 編輯模式相關變數
                 isEditing: false,
+                // 記帳編輯狀態
+                isEditingExpense: false,
+                editingExpenseIndex: null,
                 
                 itinerary: JSON.parse(localStorage.getItem('trip_itinerary_v6')) || [
                     { 
@@ -300,7 +330,10 @@
         },
         mounted() {
             const loader = document.getElementById('loading-screen');
-            if(loader) loader.style.display = 'none';
+            if(loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
+            }
             const savedRate = localStorage.getItem('trip_rate');
             if(savedRate) this.exchangeRate = parseFloat(savedRate);
         },
@@ -334,172 +367,4 @@
                     let min = Math.min(creditors[i].diff, Math.abs(debtors[j].diff));
                     if(min > 10) res.push({ from: debtors[j].name, to: creditors[i].name, amount: Math.round(min) });
                     creditors[i].diff -= min; debtors[j].diff += min;
-                    if(creditors[i].diff < 1) i++; if(Math.abs(debtors[j].diff) < 1) j++;
-                }
-                return res;
-            }
-        },
-        methods: {
-            // --- 編輯功能區 ---
-            openAddModal() {
-                this.isEditing = false;
-                this.form = { id: null, time: '', location: '', note: '', desc: '', img: '' };
-                this.showAddModal = true;
-            },
-            editItem(item) {
-                // 將資料複製到 form，並開啟編輯模式
-                this.form = { ...item };
-                this.isEditing = true;
-                this.showAddModal = true;
-            },
-            closeModal() {
-                this.showAddModal = false;
-                this.isEditing = false;
-                this.form = { id: null, time: '', location: '', note: '', desc: '', img: '' };
-            },
-            saveItemInstant() {
-                if (!this.form.time || !this.form.location) return alert('請輸入時間與地點');
-                
-                if (this.isEditing) {
-                    // 編輯模式：找到原本的項目並更新
-                    const index = this.itinerary.findIndex(i => i.id === this.form.id);
-                    if (index !== -1) {
-                        this.itinerary[index] = { 
-                            ...this.form, 
-                            day: this.activeDay // 保持在當前天數，或依需求修改
-                        };
-                    }
-                } else {
-                    // 新增模式
-                    this.itinerary.push({
-                        id: Date.now(), 
-                        day: this.activeDay, 
-                        time: this.form.time, 
-                        location: this.form.location, 
-                        note: this.form.note, 
-                        desc: this.form.desc, 
-                        img: this.form.img,
-                        lat: null, lng: null, isLocating: false
-                    });
-                }
-                
-                this.saveData();
-                this.closeModal();
-            },
-            
-            // --- 其他功能 ---
-            copyCode() {
-                const el = document.getElementById('exportArea');
-                el.select(); document.execCommand('copy');
-                this.copySuccess = true; setTimeout(() => this.copySuccess = false, 2000);
-            },
-            importData() {
-                if(!this.importString) return alert("請貼上代碼");
-                if(!confirm("這將會覆蓋你原本的資料，確定嗎？")) return;
-                try {
-                    const json = decodeURIComponent(escape(atob(this.importString.trim())));
-                    const data = JSON.parse(json);
-                    if(data.i) this.itinerary = data.i;
-                    if(data.e) this.expenses = data.e;
-                    if(data.r) this.exchangeRate = data.r;
-                    this.saveData();
-                    alert("同步成功！");
-                    this.showSyncModal = false;
-                    this.importString = '';
-                    location.reload();
-                } catch(e) { alert("代碼格式錯誤"); }
-            },
-            resetData() {
-                if(confirm('確定要清空資料重來嗎？')) {
-                    localStorage.removeItem('trip_itinerary_v6');
-                    localStorage.removeItem('trip_expenses_v6');
-                    location.reload();
-                }
-            },
-            switchTab(tab) {
-                this.currentTab = tab;
-                if (tab === 'map') nextTick(() => this.initMap());
-            },
-            changeDay(day) {
-                this.activeDay = day;
-                if (this.currentTab === 'map') this.updateMapMarkers();
-            },
-            initMap() {
-                if (this.map) { this.map.invalidateSize(); this.updateMapMarkers(); return; }
-                this.map = L.map('map').setView([33.5902, 130.4017], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(this.map);
-                this.updateMapMarkers();
-            },
-            updateMapMarkers() {
-                if (!this.map) return;
-                this.markers.forEach(m => this.map.removeLayer(m));
-                this.markers = [];
-                const points = [];
-                this.filteredItinerary.forEach(item => {
-                    if (item.lat && item.lng) {
-                        const marker = L.marker([item.lat, item.lng]).addTo(this.map).bindPopup(`<b>${item.time}</b><br>${item.location}`);
-                        this.markers.push(marker); points.push([item.lat, item.lng]);
-                    }
-                });
-                if (points.length > 0) this.map.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
-            },
-            showOnMap(item) {
-                this.switchTab('map');
-                nextTick(() => {
-                    this.map.setView([item.lat, item.lng], 16);
-                    L.popup().setLatLng([item.lat, item.lng]).setContent(item.location).openOn(this.map);
-                });
-            },
-            locateMe() {
-                if (!navigator.geolocation) return alert("瀏覽器不支援定位");
-                navigator.geolocation.getCurrentPosition(pos => {
-                    const { latitude, longitude } = pos.coords;
-                    if (this.userMarker) this.map.removeLayer(this.userMarker);
-                    this.userMarker = L.circleMarker([latitude, longitude], {
-                        radius: 8, fillColor: "#3b82f6", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8
-                    }).addTo(this.map).bindPopup("我在這！").openPopup();
-                    this.map.setView([latitude, longitude], 15);
-                }, () => alert("無法取得位置"));
-            },
-            fitAllMarkers() { this.updateMapMarkers(); },
-            
-            async manualLocate(item) {
-                item.isLocating = true;
-                try {
-                    const q = encodeURIComponent(item.location + " Fukuoka");
-                    const controller = new AbortController();
-                    setTimeout(() => controller.abort(), 3000); 
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`, { signal: controller.signal });
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                        item.lat = parseFloat(data[0].lat);
-                        item.lng = parseFloat(data[0].lon);
-                        this.saveData(); 
-                    } else { alert('找不到地點'); }
-                } catch (e) { alert('連線失敗或超時'); } 
-                finally { item.isLocating = false; }
-            },
-            saveData() {
-                localStorage.setItem('trip_itinerary_v6', JSON.stringify(this.itinerary));
-                localStorage.setItem('trip_expenses_v6', JSON.stringify(this.expenses));
-            },
-            addExpense() {
-                if(!this.newExpense.payer || !this.newExpense.amount) return;
-                this.expenses.unshift({...this.newExpense});
-                this.newExpense.amount = ''; this.newExpense.desc = '';
-                this.saveData();
-            },
-            deleteItem(id) {
-                if(confirm('刪除？')) {
-                    this.itinerary = this.itinerary.filter(i => i.id !== id);
-                    this.saveData();
-                }
-            }
-        }
-    });
-    
-    app.mount('#app');
-</script>
-
-</body>
-</html>
+                    if(creditors[i].diff < 1) i++; if(Math.abs(debtors[j].
