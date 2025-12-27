@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>北九州旅遊小幫手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* 隱藏捲軸但保留功能 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* iOS 風格的動態效果 */
+        .ios-btn {
+            transition: transform 0.1s;
+        }
+        .ios-btn:active {
+            transform: scale(0.95);
+        }
+        body {
+            background-color: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+    </style>
+</head>
+<body class="text-gray-800 h-screen w-full overflow-hidden">
+
+<div id="app" class="h-full w-full max-w-md mx-auto bg-white shadow-2xl relative flex flex-col overflow-hidden">
+    
+    <header class="bg-blue-600 text-white p-4 pt-12 pb-6 shadow-md z-10">
+        <h1 class="text-2xl font-bold tracking-wide">
+            <i class="fa-solid fa-plane-departure mr-2"></i>福岡北九州之旅
+        </h1>
+        <p class="text-blue-100 text-sm mt-1">盡情享受美食與美景！</p>
+    </header>
+
+    <main class="flex-1 overflow-y-auto no-scrollbar bg-gray-50 pb-24 relative">
+        
+        <div v-if="currentTab === 'schedule'" class="p-4">
+            <div class="flex space-x-3 overflow-x-auto no-scrollbar mb-6 pb-2">
+                <button 
+                    v-for="day in days" 
+                    :key="day"
+                    @click="activeDay = day"
+                    :class="['px-5 py-2 rounded-full whitespace-nowrap text-sm font-bold shadow-sm transition-all', 
+                             activeDay === day ? 'bg-blue-600 text-white' : 'bg-white text-gray-500']">
+                    第 {{ day }} 天
+                </button>
+                <button @click="addDay" class="px-3 py-2 rounded-full bg-gray-200 text-gray-600">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div v-if="filteredItinerary.length === 0" class="text-center py-10 text-gray-400">
+                    <i class="fa-regular fa-calendar-xmark text-4xl mb-2"></i>
+                    <p>這天還沒有行程喔！</p>
+                </div>
+
+                <div v-for="(item, index) in filteredItinerary" :key="item.id" class="relative pl-6 border-l-2 border-blue-200 ml-2">
+                    <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
+                    
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 ios-btn relative group">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-blue-600 font-bold text-sm">{{ item.time }}</span>
+                                <h3 class="font-bold text-lg text-gray-800">{{ item.location }}</h3>
+                                <p class="text-gray-500 text-sm mt-1">{{ item.note }}</p>
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button @click="openMap(item.location)" class="text-blue-500 bg-blue-50 p-2 rounded-lg text-sm">
+                                    <i class="fa-solid fa-location-arrow"></i> 導航
+                                </button>
+                                <button @click="editItem(item)" class="text-gray-400 hover:text-gray-600">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button @click="deleteItem(item.id)" class="absolute -top-2 -right-2 bg-red-100 text-red-500 rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-sm">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <button @click="showAddModal = true" class="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl ios-btn z-20">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+
+        <div v-if="currentTab === 'money'" class="p-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                <h2 class="font-bold text-gray-700 mb-4">快速記帳</h2>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <input v-model="newExpense.payer" placeholder="付款人 (例: 我)" class="bg-gray-50 p-3 rounded-lg border-none focus:ring-2 ring-blue-200 w-full">
+                    <input v-model.number="newExpense.amount" type="number" placeholder="金額 (日幣)" class="bg-gray-50 p-3 rounded-lg border-none focus:ring-2 ring-blue-200 w-full">
+                </div>
+                <input v-model="newExpense.desc" placeholder="項目 (例: 拉麵、車票)" class="bg-gray-50 p-3 rounded-lg border-none focus:ring-2 ring-blue-200 w-full mb-3">
+                <button @click="addExpense" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold shadow-md ios-btn">
+                    <i class="fa-solid fa-check mr-2"></i>新增消費
+                </button>
+            </div>
+
+            <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 mb-6">
+                <h3 class="font-bold text-indigo-800 mb-2"><i class="fa-solid fa-calculator mr-2"></i>分帳建議</h3>
+                <div v-if="settlement.length === 0" class="text-sm text-indigo-400">目前沒有需要結算的帳務。</div>
+                <ul class="space-y-2">
+                    <li v-for="s in settlement" class="flex justify-between items-center text-sm font-medium">
+                        <span class="text-gray-600">{{ s.from }}</span>
+                        <span class="text-gray-400"><i class="fa-solid fa-arrow-right"></i></span>
+                        <span class="text-gray-600">{{ s.to }}</span>
+                        <span class="text-red-500 font-bold">¥{{ s.amount }}</span>
+                    </li>
+                </ul>
+            </div>
+
+            <h3 class="font-bold text-gray-600 mb-3 px-1">消費紀錄</h3>
+            <div class="space-y-3">
+                <div v-for="(exp, idx) in expenses" :key="idx" class="bg-white p-4 rounded-xl flex justify-between items-center shadow-sm">
+                    <div>
+                        <div class="font-bold text-gray-800">{{ exp.desc }}</div>
+                        <div class="text-xs text-gray-400">{{ exp.payer }} 先付</div>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-green-600 font-bold mr-3">¥{{ exp.amount }}</span>
+                        <button @click="deleteExpense(idx)" class="text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentTab === 'map'" class="h-full w-full flex flex-col">
+            <div class="p-4 bg-white shadow-sm z-10">
+                <input v-model="mapSearch" @keyup.enter="updateMap" placeholder="輸入地點搜尋 (例: 博多運河城)" class="w-full bg-gray-100 p-3 rounded-xl pl-10 relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-8 top-8 text-gray-400"></i>
+            </div>
+            <div class="flex-1 bg-gray-200 relative">
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    frameborder="0" 
+                    style="border:0" 
+                    :src="mapUrl" 
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="bg-white border-t border-gray-100 flex justify-around items-center h-20 pb-2 fixed bottom-0 w-full max-w-md z-30">
+        <button @click="currentTab = 'schedule'" :class="['flex flex-col items-center space-y-1 w-full h-full justify-center', currentTab === 'schedule' ? 'text-blue-600' : 'text-gray-400']">
+            <i class="fa-solid fa-list-check text-xl"></i>
+            <span class="text-xs font-medium">行程</span>
+        </button>
+        <button @click="currentTab = 'money'" :class="['flex flex-col items-center space-y-1 w-full h-full justify-center', currentTab === 'money' ? 'text-green-600' : 'text-gray-400']">
+            <i class="fa-solid fa-yen-sign text-xl"></i>
+            <span class="text-xs font-medium">分帳</span>
+        </button>
+        <button @click="currentTab = 'map'" :class="['flex flex-col items-center space-y-1 w-full h-full justify-center', currentTab === 'map' ? 'text-red-500' : 'text-gray-400']">
+            <i class="fa-solid fa-map-location-dot text-xl"></i>
+            <span class="text-xs font-medium">地圖</span>
+        </button>
+    </nav>
+
+    <div v-if="showAddModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+            <h3 class="text-xl font-bold mb-4">{{ isEditing ? '編輯行程' : '新增行程' }}</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-500 font-bold ml-1">時間</label>
+                    <input type="time" v-model="form.time" class="w-full bg-gray-50 p-3 rounded-lg border focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-bold ml-1">地點</label>
+                    <input type="text" v-model="form.location" placeholder="地點 (例: 門司港)" class="w-full bg-gray-50 p-3 rounded-lg border focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-bold ml-1">備註</label>
+                    <textarea v-model="form.note" placeholder="備註 (例: 吃燒咖哩)" class="w-full bg-gray-50 p-3 rounded-lg border focus:border-blue-500 outline-none h-20"></textarea>
+                </div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+                <button @click="closeModal" class="flex-1 py-3 bg-gray-100 rounded-xl text-gray-600 font-bold">取消</button>
+                <button @click="saveItem" class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg ios-btn">儲存</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                currentTab: 'schedule',
+                activeDay: 1,
+                days: [1, 2, 3, 4],
+                showAddModal: false,
+                isEditing: false,
+                mapSearch: '福岡博多車站',
+                mapUrlRaw: 'https://maps.google.com/maps?q=福岡博多車站&t=&z=15&ie=UTF8&iwloc=&output=embed',
+                
+                // 行程資料結構
+                itinerary: JSON.parse(localStorage.getItem('trip_itinerary')) || [
+                    { id: 1, day: 1, time: '10:00', location: '福岡機場', note: '抵達、領取 JR Pass' },
+                    { id: 2, day: 1, time: '12:30', location: '博多車站', note: '吃牛腸鍋午餐' },
+                    { id: 3, day: 2, time: '09:00', location: '門司港車站', note: '拍照、散步到港口' },
+                    { id: 4, day: 2, time: '11:30', location: '唐戶市場', note: '搭船過去吃壽司' },
+                ],
+                
+                // 表單暫存
+                form: { id: null, time: '', location: '', note: '' },
+
+                // 帳務資料
+                expenses: JSON.parse(localStorage.getItem('trip_expenses')) || [],
+                newExpense: { payer: '', amount: '', desc: '' },
+            }
+        },
+        computed: {
+            filteredItinerary() {
+                return this.itinerary
+                    .filter(item => item.day === this.activeDay)
+                    .sort((a, b) => a.time.localeCompare(b.time));
+            },
+            mapUrl() {
+                return https://maps.google.com/maps?q=${encodeURIComponent(this.mapSearch)}&t=&z=15&ie=UTF8&iwloc=&output=embed;
+            },
+            // 簡易分帳邏輯 (假設平分)
+            settlement() {
+                if (this.expenses.length === 0) return [];
+
+                let payers = {};
+                let total = 0;
+                
+                // 1. 統計每個人付了多少
+                this.expenses.forEach(e => {
+                    if (!payers[e.payer]) payers[e.payer] = 0;
+                    payers[e.payer] += e.amount;
+                    total += e.amount;
+                });
+
+                let people = Object.keys(payers);
+                if (people.length === 0) return [];
+                
+                let average = total / people.length;
+                let balance = [];
+
+                // 2. 計算每個人的 應付 - 實付
+                people.forEach(p => {
+                    balance.push({ name: p, diff: payers[p] - average });
+                });
+
+                // 3. 配對 (正數是多付要拿錢，負數是少付要給錢)
+                let creditors = balance.filter(b => b.diff > 0).sort((a, b) => b.diff - a.diff); // 收錢的人
+                let debtors = balance.filter(b => b.diff < 0).sort((a, b) => a.diff - b.diff); // 付錢的人
+                
+                let result = [];
+                let cIdx = 0;
+                let dIdx = 0;
+
+                while (cIdx < creditors.length && dIdx < debtors.length) {
+                    let credit = creditors[cIdx].diff;
+                    let debt = Math.abs(debtors[dIdx].diff);
+                    let amount = Math.min(credit, debt);
+                    
+                    if (amount > 1) { // 忽略極小金額誤差
+                        result.push({
+                            from: debtors[dIdx].name,
+                            to: creditors[cIdx].name,
+                            amount: Math.round(amount)
+                        });
+                    }
+
+                    creditors[cIdx].diff -= amount;
+                    debtors[dIdx].diff += amount;
+
+                    if (Math.abs(creditors[cIdx].diff) < 1) cIdx++;
+                    if (Math.abs(debtors[dIdx].diff) < 1) dIdx++;
+                }
+                return result;
+            }
+        },
+        methods: {
+            saveData() {
+                localStorage.setItem('trip_itinerary', JSON.stringify(this.itinerary));
+                localStorage.setItem('trip_expenses', JSON.stringify(this.expenses));
+            },
+            addDay() {
+                this.days.push(this.days.length + 1);
+            },
+            openMap(location) {
+                // 1. 切換到地圖 Tab
+                this.currentTab = 'map';
+                // 2. 設定搜尋關鍵字
+                this.mapSearch = location;
+                // 3. 在真實手機上，也可以選擇直接打開 App (可選)
+                // window.open(https://www.google.com/maps/search/?api=1&query=${location});
+            },
+            updateMap() {
+                // 由 computed property mapUrl 自動處理 iframe 更新
+            },
+            
+            // --- 行程 CRUD ---
+            closeModal() {
+                this.showAddModal = false;
+                this.form = { id: null, time: '', location: '', note: '' };
+                this.isEditing = false;
+            },
+            editItem(item) {
+                this.form = { ...item };
+                this.isEditing = true;
+                this.showAddModal = true;
+            },
+            saveItem() {
+                if (!this.form.time || !this.form.location) return alert('請輸入時間和地點');
+                
+                if (this.isEditing) {
+                    const idx = this.itinerary.findIndex(i => i.id === this.form.id);
+                    if (idx !== -1) this.itinerary[idx] = { ...this.form, day: this.activeDay };
+                } else {
+                    this.itinerary.push({
+                        id: Date.now(),
+                        day: this.activeDay,
+                        ...this.form
+                    });
+                }
+                this.saveData();
+                this.closeModal();
+            },
+            deleteItem(id) {
+                if(confirm('確定刪除嗎？')) {
+                    this.itinerary = this.itinerary.filter(i => i.id !== id);
+                    this.saveData();
+                }
+            },
+
+            // --- 記帳 CRUD ---
+            addExpense() {
+                if (!this.newExpense.payer || !this.newExpense.amount) return alert('請輸入付款人和金額');
+                this.expenses.unshift({ ...this.newExpense });
+                this.newExpense.amount = '';
+                this.newExpense.desc = '';
+                this.saveData();
+            },
+            deleteExpense(idx) {
+                if(confirm('刪除這筆帳目？')) {
+                    this.expenses.splice(idx, 1);
+                    this.saveData();
+                }
+            }
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
