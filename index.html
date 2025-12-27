@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>北九州輕旅行 V3.1</title>
+    <title>北九州輕旅行 V3.2 (極速版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,28 +12,16 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <style>
-        body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: #f0fdfa; /* Teal-50 */
-            color: #334155;
-        }
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #f0fdfa; color: #334155; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .ios-btn:active { transform: scale(0.97); transition: transform 0.1s; }
-        
         #map { height: 100%; width: 100%; z-index: 0; }
         .leaflet-pane { z-index: 0 !important; }
-        .leaflet-control { z-index: 10 !important; }
         
         <script>
             tailwind.config = {
-                theme: {
-                    extend: {
-                        colors: {
-                            teal: { 50: '#f0fdfa', 100: '#ccfbf1', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 800: '#115e59' }
-                        }
-                    }
-                }
+                theme: { extend: { colors: { teal: { 50: '#f0fdfa', 100: '#ccfbf1', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 800: '#115e59' } } } }
             }
         </script>
     </style>
@@ -45,7 +33,7 @@
     <header class="bg-white/90 backdrop-blur pt-12 pb-3 px-6 z-20 border-b border-gray-100 flex justify-between items-end">
         <div>
             <h1 class="text-2xl font-bold tracking-wider text-teal-700">福岡の旅</h1>
-            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">Smart Travel Planner</p>
+            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V3.2 Instant Save</p>
         </div>
         <div v-if="currentTab === 'schedule' && weather" class="flex flex-col items-end text-teal-600">
             <i :class="[weatherIcon, 'text-xl mb-1']"></i>
@@ -75,19 +63,23 @@
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-50 ios-btn relative overflow-hidden group">
                         <div class="flex justify-between items-start mb-2">
                             <span class="text-teal-600 font-black text-xl">{{ item.time }}</span>
-                            <div class="flex space-x-2">
-                                <button v-if="item.lat" @click="showOnMap(item)" class="text-teal-400 hover:text-teal-600"><i class="fa-solid fa-map-location-dot"></i></button>
-                                <span v-else class="text-gray-200 cursor-not-allowed"><i class="fa-solid fa-map-location-dot"></i></span>
-                                <button @click="deleteItem(item.id)" class="text-gray-200 hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
-                            </div>
+                            <button @click="deleteItem(item.id)" class="text-gray-200 hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
                         </div>
                         <h3 class="font-bold text-lg text-gray-700">{{ item.location }}</h3>
                         <p class="text-gray-400 text-xs mt-1 leading-relaxed">{{ item.note }}</p>
-                        <div v-if="item.lat" class="mt-3 inline-flex items-center text-[10px] bg-teal-50 text-teal-600 px-2 py-1 rounded">
-                            <i class="fa-solid fa-check mr-1"></i>已定位
-                        </div>
-                        <div v-else class="mt-3 inline-flex items-center text-[10px] bg-gray-50 text-gray-400 px-2 py-1 rounded">
-                            <i class="fa-solid fa-ban mr-1"></i>無地圖資訊
+                        
+                        <div class="mt-4 flex items-center space-x-2">
+                            <span v-if="item.status === 'searching'" class="text-xs text-orange-400 flex items-center bg-orange-50 px-2 py-1 rounded">
+                                <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> 定位中...
+                            </span>
+                            
+                            <button v-else-if="item.lat" @click="showOnMap(item)" class="text-xs text-teal-600 bg-teal-50 px-3 py-1.5 rounded-lg font-bold flex items-center">
+                                <i class="fa-solid fa-map-location-dot mr-1"></i> 查看地圖
+                            </button>
+                            
+                            <a v-else :href="'https://www.google.com/maps/search/?api=1&query=' + item.location" target="_blank" class="text-xs text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg font-bold flex items-center">
+                                <i class="fa-brands fa-google mr-1"></i> Google 導航
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -97,14 +89,14 @@
         <div v-if="currentTab === 'money'" class="p-5">
             <div class="bg-teal-800 text-teal-50 p-5 rounded-2xl shadow-lg mb-6 flex justify-between items-center">
                 <div>
-                    <div class="text-xs opacity-70 mb-1">目前匯率 (JPY → TWD)</div>
+                    <div class="text-xs opacity-70 mb-1">匯率 (JPY → TWD)</div>
                     <div class="text-2xl font-bold flex items-center">
                         <span class="mr-2">×</span>
                         <input type="number" step="0.001" v-model="exchangeRate" class="bg-transparent border-b border-teal-400 w-20 text-center focus:outline-none font-mono">
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs opacity-70">1000円 約等於</div>
+                    <div class="text-xs opacity-70">1000円 ≈</div>
                     <div class="text-xl font-bold">NT$ {{ (1000 * exchangeRate).toFixed(0) }}</div>
                 </div>
             </div>
@@ -114,17 +106,11 @@
                     <input v-model="newExpense.payer" placeholder="付款人" class="bg-gray-50 p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100">
                     <input type="number" v-model.number="newExpense.amount" placeholder="金額 (日幣)" class="bg-gray-50 p-3 rounded-xl text-center text-sm outline-none focus:ring-2 ring-teal-100">
                 </div>
-                <input v-model="newExpense.desc" placeholder="項目 (例: 一蘭拉麵)" class="w-full bg-gray-50 p-3 rounded-xl text-center text-sm mb-3 outline-none focus:ring-2 ring-teal-100">
-                
-                <div v-if="newExpense.amount" class="text-center text-xs text-teal-600 font-bold mb-3">
-                    折合台幣約 NT$ {{ Math.round(newExpense.amount * exchangeRate) }}
-                </div>
-
+                <input v-model="newExpense.desc" placeholder="項目" class="w-full bg-gray-50 p-3 rounded-xl text-center text-sm mb-3 outline-none focus:ring-2 ring-teal-100">
                 <button @click="addExpense" class="w-full bg-teal-500 text-white py-3 rounded-xl font-bold shadow-md ios-btn">記帳</button>
             </div>
 
             <div class="space-y-3">
-                <h3 class="text-xs font-bold text-gray-400 px-1">消費明細</h3>
                 <div v-for="(exp, idx) in expenses" :key="idx" class="bg-white p-4 rounded-xl flex justify-between items-center shadow-sm border border-gray-50">
                     <div>
                         <div class="font-bold text-gray-700">{{ exp.desc }}</div>
@@ -159,14 +145,6 @@
                     <i class="fa-solid fa-expand"></i>
                 </button>
             </div>
-            <div class="absolute top-4 left-4 right-4 z-[400]">
-                <div class="bg-white/90 backdrop-blur rounded-xl shadow-md p-3 flex items-center">
-                    <i class="fa-solid fa-map-pin text-teal-500 mr-2"></i>
-                    <span class="text-sm font-medium text-gray-600">
-                        {{ activeDay }}日目行程分佈 ({{ filteredItinerary.filter(i=>i.lat).length }} 個定位點)
-                    </span>
-                </div>
-            </div>
         </div>
 
     </main>
@@ -188,16 +166,12 @@
             <h3 class="font-bold text-gray-800 mb-4 text-center">新增行程</h3>
             <div class="space-y-4">
                 <input type="time" v-model="form.time" class="w-full bg-gray-50 p-3 rounded-xl text-center font-bold text-teal-700 outline-none">
-                <div class="relative">
-                    <input type="text" v-model="form.location" placeholder="地點名稱 (例: 門司港)" class="w-full bg-gray-50 p-3 rounded-xl outline-none pl-10">
-                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400 text-xs"></i>
-                </div>
+                <input type="text" v-model="form.location" placeholder="地點名稱" class="w-full bg-gray-50 p-3 rounded-xl outline-none text-center">
                 <textarea v-model="form.note" placeholder="備註..." class="w-full bg-gray-50 p-3 rounded-xl outline-none h-20 resize-none"></textarea>
                 <div class="flex space-x-3">
                     <button @click="showAddModal = false" class="flex-1 py-3 bg-gray-100 rounded-xl text-gray-500 font-bold">取消</button>
-                    <button @click="saveItem" class="flex-1 py-3 bg-teal-500 text-white rounded-xl font-bold">
-                        <span v-if="isSearching"><i class="fa-solid fa-spinner fa-spin"></i> 搜尋中...</span>
-                        <span v-else>儲存</span>
+                    <button @click="saveItemInstant" class="flex-1 py-3 bg-teal-500 text-white rounded-xl font-bold">
+                        儲存
                     </button>
                 </div>
             </div>
@@ -220,7 +194,6 @@
                 activeDay: 1,
                 days: [1, 2, 3],
                 showAddModal: false,
-                isSearching: false,
                 weather: null,
                 exchangeRate: 0.22,
                 map: null,
@@ -228,9 +201,7 @@
                 userMarker: null,
                 
                 itinerary: JSON.parse(localStorage.getItem('trip_itinerary_v3')) || [
-                    { id: 1, day: 1, time: '11:00', location: '福岡機場', note: '抵達', lat: 33.5859, lng: 130.4502 },
-                    { id: 2, day: 1, time: '13:00', location: '博多車站', note: '午餐', lat: 33.5897, lng: 130.4207 },
-                    { id: 3, day: 1, time: '15:30', location: '大濠公園', note: '散步', lat: 33.5855, lng: 130.3765 },
+                    { id: 1, day: 1, time: '11:00', location: '福岡機場', note: '抵達', lat: 33.5859, lng: 130.4502, status: 'done' },
                 ],
                 form: { time: '', location: '', note: '' },
                 expenses: JSON.parse(localStorage.getItem('trip_expenses_v3')) || [],
@@ -290,9 +261,7 @@
             initMap() {
                 if (this.map) { this.map.invalidateSize(); this.updateMapMarkers(); return; }
                 this.map = L.map('map').setView([33.5902, 130.4017], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap', maxZoom: 19
-                }).addTo(this.map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(this.map);
                 this.updateMapMarkers();
             },
             updateMapMarkers() {
@@ -309,13 +278,11 @@
                 if (points.length > 0) this.map.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
             },
             showOnMap(item) {
-                if (item.lat && item.lng) {
-                    this.switchTab('map');
-                    nextTick(() => {
-                        this.map.setView([item.lat, item.lng], 16);
-                        L.popup().setLatLng([item.lat, item.lng]).setContent(item.location).openOn(this.map);
-                    });
-                }
+                this.switchTab('map');
+                nextTick(() => {
+                    this.map.setView([item.lat, item.lng], 16);
+                    L.popup().setLatLng([item.lat, item.lng]).setContent(item.location).openOn(this.map);
+                });
             },
             locateMe() {
                 if (!navigator.geolocation) return alert("瀏覽器不支援定位");
@@ -330,46 +297,56 @@
             },
             fitAllMarkers() { this.updateMapMarkers(); },
             
-            // --- 修復的儲存功能 (含超時機制) ---
-            async saveItem() {
-                if (!this.form.time || !this.form.location) return alert('資料不全');
+            // --- 核心：極速儲存 (Background Fetch) ---
+            saveItemInstant() {
+                if (!this.form.time || !this.form.location) return alert('請輸入時間與地點');
                 
-                this.isSearching = true;
-                let lat = null, lng = null;
-
-                try {
-                    // 設定 3 秒超時，避免卡死
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-                    const q = encodeURIComponent(this.form.location + " Fukuoka");
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`, {
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId); // 如果成功，清除計時器
-
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                        lat = parseFloat(data[0].lat);
-                        lng = parseFloat(data[0].lon);
-                    }
-                } catch (e) {
-                    console.log("地圖搜尋超時或失敗，將僅儲存文字");
-                }
-
-                this.itinerary.push({
+                // 1. 先建立一個「定位中」的項目
+                const newItem = {
                     id: Date.now(),
                     day: this.activeDay,
                     time: this.form.time,
                     location: this.form.location,
                     note: this.form.note,
-                    lat: lat,
-                    lng: lng
-                });
-                
-                this.isSearching = false;
+                    lat: null,
+                    lng: null,
+                    status: 'searching' // 新增狀態標記
+                };
+
+                // 2. 直接加入列表，並關閉視窗 (UI 瞬間反應)
+                this.itinerary.push(newItem);
+                this.saveData();
                 this.showAddModal = false;
                 this.form = { time: '', location: '', note: '' };
+
+                // 3. 在背景偷跑去抓座標
+                this.fetchCoordsInBackground(newItem);
+            },
+            async fetchCoordsInBackground(item) {
+                try {
+                    const q = encodeURIComponent(item.location + " Fukuoka");
+                    // 設定 2 秒超時，避免背景也卡太久
+                    const controller = new AbortController();
+                    setTimeout(() => controller.abort(), 2000);
+
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`, { signal: controller.signal });
+                    const data = await res.json();
+                    
+                    if (data && data.length > 0) {
+                        // 找到了！更新資料
+                        item.lat = parseFloat(data[0].lat);
+                        item.lng = parseFloat(data[0].lon);
+                        item.status = 'done';
+                    } else {
+                        // 沒找到
+                        item.status = 'failed';
+                    }
+                } catch (e) {
+                    // 超時或網路錯誤
+                    item.status = 'failed';
+                    console.log("Background fetch failed, using fallback.");
+                }
+                // 4. 更新 LocalStorage
                 this.saveData();
             },
             saveData() {
