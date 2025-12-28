@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>北九州輕旅行 V7.0 (自由排序版)</title>
+    <title>北九州輕旅行 V7.1 (左右切換版)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -34,7 +34,7 @@
 <div id="loading-screen">
     <div id="spinner">
         <i class="fa-solid fa-plane fa-bounce text-5xl text-teal-500 mb-4"></i>
-        <h2 class="text-xl font-bold text-gray-700">正在載入 V7.0...</h2>
+        <h2 class="text-xl font-bold text-gray-700">正在載入 V7.1...</h2>
         <p class="text-sm text-gray-400 mt-2">若卡住超過 5 秒，請按下方按鈕</p>
     </div>
     <div id="error-log" class="hidden text-red-500 text-xs text-left bg-gray-100 p-4 rounded mt-4 w-full max-w-xs overflow-auto h-32"></div>
@@ -47,7 +47,7 @@
     <header class="bg-white/95 backdrop-blur pt-12 pb-3 px-6 z-20 border-b border-gray-100 flex justify-between items-end">
         <div>
             <h1 class="text-2xl font-bold tracking-wider text-teal-700">福岡の旅</h1>
-            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V7.0 Reorder</p>
+            <p class="text-gray-400 text-[10px] tracking-[0.2em] uppercase">V7.1 Day Nav</p>
         </div>
         <button @click="showSyncModal = true" class="bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center shadow-sm border border-teal-100 hover:bg-teal-100 transition-colors">
             <i class="fa-solid fa-arrows-rotate mr-1"></i> 同步
@@ -56,13 +56,35 @@
 
     <main class="flex-1 overflow-y-auto no-scrollbar bg-gray-50 pb-24 relative">
         <div v-if="currentTab === 'schedule'" class="p-5">
-            <div class="flex space-x-3 overflow-x-auto no-scrollbar mb-6 py-2">
-                <button v-for="day in days" :key="day" @click="changeDay(day)" :class="['px-5 py-2 rounded-full text-sm font-bold transition-all shadow-sm whitespace-nowrap', activeDay === day ? 'bg-teal-500 text-white shadow-teal-200' : 'bg-white text-gray-400 border border-gray-100']">Day {{ day }}</button>
-                <button @click="days.push(days.length + 1)" class="px-4 py-2 rounded-full bg-white border border-gray-200 text-gray-400 ios-btn"><i class="fa-solid fa-plus"></i></button>
+            
+            <div class="flex items-center space-x-2 mb-6 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
+                <button @click="prevDay" :disabled="activeDay === 1" 
+                    :class="['w-10 h-10 rounded-full flex items-center justify-center transition-colors', activeDay === 1 ? 'text-gray-200' : 'text-teal-600 bg-teal-50 hover:bg-teal-100 ios-btn']">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+
+                <div class="flex-1 overflow-x-auto no-scrollbar flex space-x-2 px-1" ref="dayContainer">
+                    <button v-for="day in days" :key="day" @click="activeDay = day" 
+                        :class="['px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all', 
+                                 activeDay === day ? 'bg-teal-500 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50']">
+                        Day {{ day }}
+                    </button>
+                </div>
+
+                <button @click="nextDay" :disabled="activeDay === days.length" 
+                    :class="['w-10 h-10 rounded-full flex items-center justify-center transition-colors', activeDay === days.length ? 'text-gray-200' : 'text-teal-600 bg-teal-50 hover:bg-teal-100 ios-btn']">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+
+                <button @click="addNewDay" class="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 ios-btn border border-gray-200">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
             </div>
             
             <div class="space-y-6">
-                <div v-if="filteredItinerary.length === 0" class="text-center py-20 text-gray-300 font-light">點擊右下角 + 新增行程</div>
+                <div v-if="filteredItinerary.length === 0" class="text-center py-20 text-gray-300 font-light">
+                    點擊右下角 + 新增行程
+                </div>
                 
                 <div v-for="(item, index) in filteredItinerary" :key="item.id" class="relative pl-6 border-l-[2px] border-teal-100 ml-3 group/card transition-all duration-300">
                     <div class="absolute -left-[9px] top-6 w-4 h-4 rounded-full bg-white border-[4px] border-teal-400 z-10"></div>
@@ -175,30 +197,25 @@
         },
         watch: { exchangeRate(newVal) { localStorage.setItem('trip_rate', newVal); } },
         computed: {
-            // V7.0 重點：移除 .sort()，讓使用者可以自己排序
             filteredItinerary() { return this.itinerary.filter(i => i.day === this.activeDay); },
             exportString() { const data = { i: this.itinerary, e: this.expenses, r: this.exchangeRate }; try { return btoa(unescape(encodeURIComponent(JSON.stringify(data)))); } catch(e) { return "Error"; } },
             settlement() { let payers = {}; let total = 0; this.expenses.forEach(e => { if (!payers[e.payer]) payers[e.payer] = 0; payers[e.payer] += e.amount; total += e.amount; }); let people = Object.keys(payers); if (people.length === 0) return []; let avg = total / people.length; let balance = people.map(p => ({ name: p, diff: payers[p] - avg })); let creditors = balance.filter(b => b.diff > 0).sort((a,b) => b.diff - a.diff); let debtors = balance.filter(b => b.diff < 0).sort((a,b) => a.diff - b.diff); let res = []; let i = 0, j = 0; while(i < creditors.length && j < debtors.length){ let min = Math.min(creditors[i].diff, Math.abs(debtors[j].diff)); if(min > 10) res.push({ from: debtors[j].name, to: creditors[i].name, amount: Math.round(min) }); creditors[i].diff -= min; debtors[j].diff += min; if(creditors[i].diff < 1) i++; if(Math.abs(debtors[j].diff) < 1) j++; } return res; }
         },
         methods: {
-            // V7.0 新增：上移/下移功能
+            // V7.1 新增：左右切換天數
+            prevDay() { if (this.activeDay > 1) this.activeDay--; },
+            nextDay() { if (this.activeDay < this.days.length) this.activeDay++; },
+            addNewDay() { this.days.push(this.days.length + 1); this.activeDay = this.days.length; }, // 新增天數並自動切換過去
+
             moveItem(item, direction) {
-                // 1. 找出當天所有行程
                 const dayItems = this.itinerary.filter(i => i.day === this.activeDay);
                 const currentIdx = dayItems.findIndex(i => i.id === item.id);
                 if (currentIdx === -1) return;
-
-                // 2. 邊界檢查 (已經在最上面或最下面)
                 if (direction === -1 && currentIdx === 0) return;
                 if (direction === 1 && currentIdx === dayItems.length - 1) return;
-
-                // 3. 找出要交換的「鄰居」
                 const neighbor = dayItems[currentIdx + direction];
-
-                // 4. 在主陣列中交換位置
                 const realIdx1 = this.itinerary.findIndex(i => i.id === item.id);
                 const realIdx2 = this.itinerary.findIndex(i => i.id === neighbor.id);
-
                 [this.itinerary[realIdx1], this.itinerary[realIdx2]] = [this.itinerary[realIdx2], this.itinerary[realIdx1]];
                 this.saveData();
             },
